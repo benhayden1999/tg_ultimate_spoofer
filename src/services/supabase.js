@@ -105,10 +105,34 @@ async function addJob(userId) {
     .single();
 }
 
+async function getGpsCoords(userId) {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("latitude, longitude")
+      .eq("user_id", userId)
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    if (data.latitude === null || data.longitude === null) {
+      return null;
+    }
+
+    return data;
+  } catch (err) {
+    console.error("Error fetching GPS coordinates:", err);
+    return null;
+  }
+}
+
 export {
   supabase,
   getSubscriptionStatus,
   addSubscription,
   getTrialUsedStatus,
   addJob,
+  getGpsCoords,
 };

@@ -1,54 +1,95 @@
-// workflow.js
-import fetch from "node-fetch";
-import { exiftool } from "exiftool-vendored";
-import fs from "fs";
+// import fs from "fs";
+// import { exiftool } from "exiftool-vendored";
+// import { fileTypeFromBuffer } from "file-type";
+// import sharp from "sharp";
 
-export async function handleDocumentWorkflow(
-  ctx,
-  { fileId, originalFileName }
-) {
-  // (Optional) Check if it's an image or a supported video
-  const mimeType = ctx.message.document.mime_type;
-  if (!mimeType.startsWith("image/") && !mimeType.startsWith("video/")) {
-    await ctx.reply(
-      "This file is neither an image nor a supported video. Skipping..."
-    );
-    return;
-  }
+// /**
+//  * Process an image: convert to JPEG, wipe metadata, and add iPhone-like metadata.
+//  *
+//  * @param {string} inputFile - Path to the input image.
+//  * @param {string} outputFile - Path to the final output image.
+//  * @param {object} params - Metadata parameters.
+//  * @param {number} params.gpsLat - GPS latitude (e.g., 52.5127611111).
+//  * @param {number} params.gpsLong - GPS longitude (e.g., 0.6540694444).
+//  * @param {number} params.gpsAlt - GPS altitude in meters (e.g., 14.8).
+//  * @param {string} params.dateTime - Date/Time in EXIF format (e.g., "2025:01:07 19:04:25+00:00").
+//  */
+// export async function processImage(
+//   inputFile,
+//   outputFile,
+//   { gpsLat, gpsLong, gpsAlt, dateTime }
+// ) {
+//   try {
+//     // Step 1: Detect the file type
+//     const buffer = fs.readFileSync(inputFile);
+//     const type = await fileTypeFromBuffer(buffer);
 
-  // 1) Download the file from Telegram to Lambda's /tmp
-  const fileLink = await ctx.telegram.getFileLink(fileId);
-  const response = await fetch(fileLink.href);
-  if (!response.ok) {
-    throw new Error(
-      `Failed to download file from Telegram: ${response.statusText}`
-    );
-  }
+//     if (!type) {
+//       throw new Error("Unsupported or unknown file type.");
+//     }
 
-  // Use a unique filename in /tmp to avoid conflicts
-  const tmpFilename = `/tmp/${Date.now()}_${originalFileName}`;
-  const buffer = await response.buffer();
-  fs.writeFileSync(tmpFilename, buffer);
+//     console.log(`Detected file type: ${type.ext} (${type.mime})`);
 
-  // 2) Edit the file's metadata (e.g., add a title or comment)
-  // exiftool.write() edits the file in-place
-  await exiftool.write(tmpFilename, {
-    Title: "My Custom Title", // e.g., QuickTime:Title for videos, EXIF:ImageDescription for images
-    Comment: "Edited by MyBot",
-  });
+//     // Step 2: Convert to JPEG if not already JPEG
+//     let convertedFile = inputFile;
+//     if (type.ext !== "jpg" && type.ext !== "jpeg") {
+//       console.log(`Converting ${type.ext} to JPEG...`);
+//       convertedFile = inputFile.replace(/\.\w+$/, ".jpg");
+//       await sharp(inputFile)
+//         .jpeg({ quality: 90 }) // Adjust quality if needed
+//         .toFile(convertedFile);
+//     }
 
-  // 3) Read the updated file
-  const updatedBuffer = fs.readFileSync(tmpFilename);
+//     // Step 3: Wipe metadata from the converted JPEG
+//     await exiftool.write(
+//       convertedFile,
+//       {},
+//       {
+//         customArgs: ["-all="], // Wipe all metadata using the updated signature
+//       }
+//     );
 
-  // 4) Send the updated file back to Telegram
-  await ctx.replyWithDocument(
-    {
-      source: updatedBuffer,
-      filename: `edited_${originalFileName}`,
-    },
-    { caption: "Here is your updated file!" }
-  );
+//     // Step 4: Add iPhone-like metadata to the JPEG
+//     const latRef = gpsLat >= 0 ? "N" : "S";
+//     const longRef = gpsLong >= 0 ? "E" : "W";
+//     const altRef = gpsAlt >= 0 ? 0 : 1; // 0 = above sea level, 1 = below
 
-  // 5) Clean up
-  fs.unlinkSync(tmpFilename);
-}
+//     const tagsToWrite = {
+//       Make: "Apple",
+//       Model: "iPhone 14 Pro",
+//       Software: "18.1.1",
+//       Orientation: "Rotate 90 CW",
+
+//       // Date/Time
+//       DateTimeOriginal: dateTime,
+//       CreateDate: dateTime,
+//       ModifyDate: dateTime,
+
+//       // GPS
+//       GPSLatitude: Math.abs(gpsLat),
+//       GPSLatitudeRef: latRef,
+//       GPSLongitude: Math.abs(gpsLong),
+//       GPSLongitudeRef: longRef,
+//       GPSAltitude: Math.abs(gpsAlt),
+//       GPSAltitudeRef: altRef,
+
+//       // Optional iPhone-like settings
+//       ISO: 1000,
+//       FNumber: 1.8,
+//       ExposureTime: "1/35", // Shutter speed
+//       LensModel: "iPhone 14 Pro back triple camera 6.86mm f/1.78",
+//       // Add more if desired...
+//     };
+
+//     await exiftool.write(convertedFile, tagsToWrite, {
+//       customArgs: ["-overwrite_original"], // Ensure overwrites happen directly
+//     });
+
+//     // Step 5: Save the final file to the desired output path
+//     fs.renameSync(convertedFile, outputFile);
+//     console.log(`Successfully processed image: ${outputFile}`);
+//   } catch (error) {
+//     console.error("Failed to process image:", error);
+//     throw error;
+//   }
+// }

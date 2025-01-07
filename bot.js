@@ -11,9 +11,10 @@ import {
   addSubscription,
   getTrialUsedStatus,
   addJob,
+  getGpsCoords,
 } from "./src/services/supabase.js";
 import { createInvoiceLink } from "./src/services/telegram.js";
-import { handleDocumentWorkflow } from "./src/services/downloads.js";
+// import { handleDocumentWorkflow } from "./src/services/downloads.js";
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const price = process.env.SUBSCRIPTION_PRICE;
@@ -21,10 +22,39 @@ const price = process.env.SUBSCRIPTION_PRICE;
 console.log("Price:", price);
 
 // *_*_*_*_*_*_*_*_*_*_*_*_**_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_
+
+bot.command("setcoords", async (ctx) => {
+  ctx.reply(
+    "*Send the coordinates where you want the photos to appear as taken from.*\n\nClick the 📎 icon and select 'Location' from the bottom bar.\n\nℹ️ _We will save this location for you. To update it, simply send a new location._",
+    { parse_mode: "Markdown" }
+  );
+});
+
+bot.on(message("location"), async (ctx) => {
+  const latitude = ctx.message.location.latitude;
+  const longitude = ctx.message.location.longitude;
+  console.log(ctx.message);
+  ctx.replyWithLocation(`${latitude}`, `${longitude}`);
+});
+
+bot.command("checkcoords", async (ctx) => {
+  const coords = await getGpsCoords(ctx.from.id);
+  if (coords === null) {
+    ctx.reply(
+      "*You have no coordinates saved.*\n\nℹ️ For help use /setcoords.",
+      {
+        parse_mode: "Markdown",
+      }
+    );
+  } else {
+    ctx.replyWithLocation(coords.latitude, coords.longitude);
+    ctx.reply("If you need to change the coordinates, send another location.");
+  }
+});
+
 bot.on(message("document"), async (ctx) => {
   try {
-    const document = ctx.message.document;
-    const fileId = document.file_id;
+    const fileId = ctx.message.document.file_id;
     const originalFileName = document.file_name;
     const fileSize = document.file_size;
     const userId = ctx.from.id; // To ensure uniqueness
@@ -41,6 +71,7 @@ bot.on(message("document"), async (ctx) => {
       return;
     }
     // 2) Hand off to the workflow in workflow.js
+    const gpsCoords = await getGPSLocation(userId);
     await handleDocumentWorkflow(ctx, {
       fileId,
       originalFileName,

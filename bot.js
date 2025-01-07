@@ -1,6 +1,6 @@
 import dotenv from "dotenv";
 dotenv.config();
-import { Telegraf } from "telegraf";
+import { Telegraf, Markup } from "telegraf";
 import { message } from "telegraf/filters";
 import fetch from "node-fetch"; // To download files from Telegram
 import FormData from "form-data"; // To handle multipart/form-data
@@ -9,8 +9,10 @@ import path from "path"; // To handle file extensions
 import {
   getSubscriptionStatus,
   addSubscription,
-  getNumberOfJobs,
+  getTrialUsedStatus,
+  addJob,
 } from "./src/services/supabase.js";
+import { createInvoiceLink } from "./src/services/telegram.js";
 // import {
 //   sendMessage,
 //   createInvoiceLink,
@@ -19,16 +21,49 @@ import {
 // } from "./src/services/telegram.js";
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
+const price = process.env.SUBSCRIPTION_PRICE;
+
+console.log("Price:", price);
 
 // *_*_*_*_*_*_*_*_*_*_*_*_**_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_
 
+bot.command("affiliate", async (ctx) => {
+  ctx.reply(
+    "👆Tap to bot profile and join affiliate. For all stars spent through this link you will receive *27%*🤑\n\n*▶️How to withdraw stars to cash?*\nCurrently only channels and bots can withdraw to TON Crypto and then Local Currency. Create a channel and when you're on the bit where you copy your link you can choose to have the stars sent to that channel. Withdraw to TON and then Cashola from there💸",
+    { parse_mode: "Markdown" }
+  );
+});
+
 bot.command("subscribe", async (ctx) => {
-  const subscriptionStatus = await getSubscriptionStatus(346345345);
-  if (subscriptionStatus === true) {
-    ctx.reply("You are already subscribed!");
-  } else if (subscriptionStatus === false) {
-    try {
-      const invoiceLink = await 
+  try {
+    const subscriptionStatus = await getSubscriptionStatus(ctx.from.id);
+    if (subscriptionStatus === true) {
+      await ctx.reply("You are already subscribed!");
+    } else {
+      const invoiceLink = await createInvoiceLink(price);
+      console.log("Invoice Link:", invoiceLink);
+      const text =
+        "🔓 Get *unlimited* requests for *1 month*\n\n_Subscription will auto-renew, use the cancel command to cancel._";
+      const buttonText = `Subscribe for ${price} ⭐️`;
+      await ctx.reply(text, {
+        parse_mode: "Markdown",
+        ...Markup.inlineKeyboard([Markup.button.url(buttonText, invoiceLink)]),
+      });
+    }
+  } catch (error) {
+    console.error("Error in subscribe command:", error);
+    ctx.reply("An error occurred. Please try again later.");
+  }
+});
+
+bot.command("cancelSubscription", async (ctx) => {
+  ctx.reply(
+    "*How to cancel subscription*\n\n1. Go to your profile in Telegram\n" +
+      "2. My Stars\n" +
+      "3. Find Bot under 'my subscriptions'\n" +
+      "4. Cancel Subscription",
+    { parse_mode: "Markdown" }
+  );
 });
 
 bot.on(message("document"), async (ctx) => {
@@ -37,11 +72,20 @@ bot.on(message("document"), async (ctx) => {
   if (subscriptionStatus === true) {
     ctx.reply("📥 Downloading the file...");
   } else {
-    const isTrial = await getNumberOfJobs(ctx.from.id);
-    if (isTrial === true) {
+    const trialUsed = await getTrialUsedStatus(ctx.from.id);
+    if (hasTrial === true) {
       ctx.reply("📥 Downloading the file...");
     } else {
-      ctx.reply("❌ You need to subscribe to download files.");
+      const invoiceLink = await createInvoiceLink(price);
+      ctx.reply(
+        "You have used your one free trial, you can get *unlimited requests* by subscribing.",
+        {
+          parse_mode: "Markdown",
+          ...Markup.inlineKeyboard([
+            Markup.button.url(`Subscribe for ${price} ⭐️`, invoiceLink),
+          ]),
+        }
+      );
     }
   }
 });

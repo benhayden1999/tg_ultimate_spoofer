@@ -41,32 +41,32 @@ async function getSubscriptionStatus(userId) {
   }
 }
 
-async function getNumberOfJobs(userId) {
+async function getTrialUsedStatus(userId) {
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("number_jobs")
+      .select("has_free_trial")
       .eq("user_id", userId)
       .single(); // Use .single() if you expect only one record
 
     if (error) {
       if (error.code === "PGRST116") {
-        console.log(`No number of jobs found for user_id: ${userId}`);
-        return false; // Indicate that the user does not have any jobs
+        console.log("user has a free trial");
+        return true; // Indicate that the user does not have any jobs
       }
       console.error("Error fetching number of jobs:", error);
       return null;
     }
 
-    if (data.number_jobs < 1) {
-      console.log(`Number of jobs is less than 1 for user_id: ${userId}`);
+    if (data.has_free_trial === false) {
+      console.log("user has used the trial");
       return false;
     } else {
-      console.log(`Number of jobs is 1 or more for user_id: ${userId}`);
+      console.log("user has got the trial");
       return true;
     }
   } catch (err) {
-    console.error("Unexpected error fetching number of jobs:", err);
+    console.error("Unexpected error fetching trial status of jobs:", err);
     return null;
   }
 }
@@ -92,4 +92,23 @@ async function addSubscription(
     .single();
 }
 
-export { supabase, getSubscriptionStatus, addSubscription, getNumberOfJobs };
+async function addJob(userId) {
+  const { data, error } = await supabase
+    .from("users")
+    .upsert(
+      {
+        user_id: userId,
+        has_free_trial: false,
+      },
+      { onConflict: ["user_id"] }
+    )
+    .single();
+}
+
+export {
+  supabase,
+  getSubscriptionStatus,
+  addSubscription,
+  getTrialUsedStatus,
+  addJob,
+};

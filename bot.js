@@ -13,12 +13,7 @@ import {
   addJob,
 } from "./src/services/supabase.js";
 import { createInvoiceLink } from "./src/services/telegram.js";
-// import {
-//   sendMessage,
-//   createInvoiceLink,
-//   handleSuccessfulPayment,
-//   replyWithButton,
-// } from "./src/services/telegram.js";
+import { handleDocumentWorkflow } from "./src/services/downloads.js";
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const price = process.env.SUBSCRIPTION_PRICE;
@@ -26,17 +21,50 @@ const price = process.env.SUBSCRIPTION_PRICE;
 console.log("Price:", price);
 
 // *_*_*_*_*_*_*_*_*_*_*_*_**_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_
+bot.on(message("document"), async (ctx) => {
+  try {
+    const document = ctx.message.document;
+    const fileId = document.file_id;
+    const originalFileName = document.file_name;
+    const fileSize = document.file_size;
+    const userId = ctx.from.id; // To ensure uniqueness
+
+    console.log(
+      `User ${userId} sent a file: ${originalFileName} (${fileSize} bytes)`
+    );
+
+    // 1. Validate file size (max 9.99 MB)
+    if (fileSize > 9.99 * 1024 * 1024) {
+      await ctx.reply(
+        "❌ The file is too large. Maximum allowed size is 10MB."
+      );
+      return;
+    }
+    // 2) Hand off to the workflow in workflow.js
+    await handleDocumentWorkflow(ctx, {
+      fileId,
+      originalFileName,
+    });
+  } catch (error) {
+    console.error("Error handling document:", error);
+    await ctx.reply("❌ An error occurred while processing your document.");
+  }
+});
 
 bot.command("affiliate", async (ctx) => {
   ctx.reply(
-    "👆Tap to bot profile and join affiliate. For all stars spent through this link you will receive *27%*🤑\n\n*▶️How to withdraw stars to cash?*\nCurrently only channels and bots can withdraw to TON Crypto and then Local Currency. Create a channel and when you're on the bit where you copy your link you can choose to have the stars sent to that channel. Withdraw to TON and then Cashola from there💸",
+    "🔗*Go to this bot's profile and join 'affiliate program' from there. For all stars spent through your link you will receive* *27%*🤑\n\n\n*▶️How to withdraw stars to cash?*\n\n1. *Commission sent to your personal account*\n_Personal accounts cannot withdraw star balances, they can only spend stars within Telegram... option 2 however;_\n\n2. *Commission sent to a channel you own*\n_Channels can withdraw to TON Crypto and from there to Local Currency.  So if you want to withdraw to the real world create a channel and set commission to go to this channel when when generating your affiliate link._",
     { parse_mode: "Markdown" }
   );
 });
 
+bot.command("start", async (ctx) => {
+  ctx.reply("click /subscribe to get started");
+});
+
 bot.command("subscribe", async (ctx) => {
   try {
-    const subscriptionStatus = await getSubscriptionStatus(ctx.from.id);
+    const subscriptionStatus = await getSubscriptionStatus(4353453);
     if (subscriptionStatus === true) {
       await ctx.reply("You are already subscribed!");
     } else {
@@ -110,32 +138,6 @@ bot.on([message("photo"), message("video")], async (ctx) => {
 });
 
 // Handle document uploads using the modern message filter
-bot.on(message("document"), async (ctx) => {
-  try {
-    const document = ctx.message.document;
-    const fileId = document.file_id;
-    const originalFileName = document.file_name;
-    const fileSize = document.file_size;
-    const userId = ctx.from.id; // To ensure uniqueness
-
-    console.log(
-      `User ${userId} sent a file: ${originalFileName} (${fileSize} bytes)`
-    );
-
-    // 1. Validate file size (max 9.99 MB)
-    if (fileSize > 9.99 * 1024 * 1024) {
-      await ctx.reply(
-        "❌ The file is too large. Maximum allowed size is 9.99 MB."
-      );
-      return;
-    }
-
-    // ...existing code...
-  } catch (error) {
-    console.error("Error handling document:", error);
-    await ctx.reply("❌ An error occurred while processing your document.");
-  }
-});
 
 //pre-checkout query
 bot.on("pre_checkout_query", async (ctx) => {

@@ -38,23 +38,25 @@ async function getSubscriptionStatus(userId) {
   }
 }
 
-async function getSubscriptionPlans() {
-  try {
-    const { data, error } = await supabase
-      .from("subscription_plans")
-      .select("*");
-
-    if (error) {
-      console.error("Error fetching subscription plans:", error);
-      return null;
-    }
-    console.log("Subscription plans:", data);
-    return data;
-  } catch (err) {
-    console.error("Unexpected error fetching subscription plans:", err);
-    return null;
-  }
+async function addSubscription(
+  userId,
+  subscriptionExpirationDate,
+  subscriptionChargeId,
+  subscriptionAmount
+) {
+  const { data, error } = await supabase
+    .from("users")
+    .upsert(
+      {
+        user_id: userId,
+        subscription_expiration_date: subscriptionExpirationDate,
+        telegram_payment_charge_id: subscriptionChargeId,
+        subscription_amount: subscriptionAmount,
+        subscription_status: true,
+      },
+      { onConflict: ["user_id"] }
+    )
+    .single();
 }
-// Add more functions here as needed
 
-export { supabase, getSubscriptionStatus, getSubscriptionPlans };
+export { supabase, getSubscriptionStatus, addSubscription };

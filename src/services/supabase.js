@@ -128,6 +128,20 @@ async function getGpsCoords(userId) {
   }
 }
 
+async function SetGpsCoords(userId, latitude, longitude) {
+  const { data, error } = await supabase
+    .from("users")
+    .upsert(
+      {
+        user_id: userId,
+        latitude: latitude,
+        longitude: longitude,
+      },
+      { onConflict: ["user_id"] }
+    )
+    .single();
+}
+
 export {
   supabase,
   getSubscriptionStatus,
@@ -135,4 +149,5 @@ export {
   getTrialUsedStatus,
   addJob,
   getGpsCoords,
+  SetGpsCoords,
 };

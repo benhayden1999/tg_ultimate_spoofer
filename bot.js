@@ -10,8 +10,8 @@ import {
   getSubscriptionStatus,
   addSubscription,
   getTrialUsedStatus,
-  addJob,
   getGpsCoords,
+  SetGpsCoords,
 } from "./src/services/supabase.js";
 import { createInvoiceLink } from "./src/services/telegram.js";
 // import { handleDocumentWorkflow } from "./src/services/downloads.js";
@@ -33,8 +33,13 @@ bot.command("setcoords", async (ctx) => {
 bot.on(message("location"), async (ctx) => {
   const latitude = ctx.message.location.latitude;
   const longitude = ctx.message.location.longitude;
-  console.log(ctx.message);
-  ctx.replyWithLocation(`${latitude}`, `${longitude}`);
+  await SetGpsCoords(ctx.from.id, latitude, longitude);
+  await ctx.telegram.unpinAllChatMessages(ctx.chat.id);
+  ctx
+    .reply(`📍 Location saved: ${latitude}, ${longitude}`)
+    .then((sentMessage) => {
+      ctx.telegram.pinChatMessage(ctx.chat.id, sentMessage.message_id);
+    });
 });
 
 bot.command("checkcoords", async (ctx) => {

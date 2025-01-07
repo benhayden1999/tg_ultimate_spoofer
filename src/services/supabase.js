@@ -21,19 +21,52 @@ async function getSubscriptionStatus(userId) {
       .single(); // Use .single() if you expect only one record
 
     if (error) {
+      if (error.code === "PGRST116") {
+        console.log(`No subscription status found for user_id: ${userId}`);
+        return false; // Indicate that the user does not have a subscription
+      }
       console.error("Error fetching subscription status:", error);
       return null;
     }
 
-    if (!data) {
-      console.warn(`No subscription status found for user_id: ${userId}`);
+    if (data.subscription_status === true) {
+      console.log(`Subscription status is true for user_id: ${userId}`);
+      return true;
+    } else {
+      return false;
+    }
+  } catch (err) {
+    console.error("Unexpected error fetching subscription status:", err);
+    return null;
+  }
+}
+
+async function getNumberOfJobs(userId) {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("number_jobs")
+      .eq("user_id", userId)
+      .single(); // Use .single() if you expect only one record
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        console.log(`No number of jobs found for user_id: ${userId}`);
+        return false; // Indicate that the user does not have any jobs
+      }
+      console.error("Error fetching number of jobs:", error);
       return null;
     }
 
-    console.log(`Subscription status for user_id ${userId}:`, data.status);
-    return data.status;
+    if (data.number_jobs < 1) {
+      console.log(`Number of jobs is less than 1 for user_id: ${userId}`);
+      return false;
+    } else {
+      console.log(`Number of jobs is 1 or more for user_id: ${userId}`);
+      return true;
+    }
   } catch (err) {
-    console.error("Unexpected error fetching subscription status:", err);
+    console.error("Unexpected error fetching number of jobs:", err);
     return null;
   }
 }
@@ -59,4 +92,4 @@ async function addSubscription(
     .single();
 }
 
-export { supabase, getSubscriptionStatus, addSubscription };
+export { supabase, getSubscriptionStatus, addSubscription, getNumberOfJobs };

@@ -9,30 +9,81 @@ import path from "path"; // To handle file extensions
 import {
   getSubscriptionStatus,
   addSubscription,
+  getNumberOfJobs,
 } from "./src/services/supabase.js";
+import {
+  sendMessage,
+  createInvoiceLink,
+  handleSuccessfulPayment,
+  replyWithButton,
+} from "./src/services/telegram.js";
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
+// *_*_*_*_*_*_*_*_*_*_*_*_**_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_
+
+bot.command("subscribe", async (ctx) => {
+  const subscriptionStatus = await getSubscriptionStatus(ctx.from.id);
+  if (subscriptionStatus === true) {
+    ctx.reply("You are already subscribed!");
+  } else if (subscriptionStatus === false) {
+    try {
+      const invoiceLink = await ctx.telegram.createInvoiceLink({
+        title: "Subscription",
+        description: "Subscribe to get unlimited requests!",
+        payload: "subscription_payload",
+        provider_token: process.env.PROVIDER_TOKEN, // Ensure this is set in your .env file
+        currency: "USD",
+        prices: [{ label: "Subscription", amount: 1000 }], // Adjust the amount as needed
+        subscription_period: 2592000, // 30 days in seconds
+      });
+
+      const text = "Subscribe to get unlimited requests!";
+      const buttonText = "Subscribe ⭐️";
+      const buttonUrl = invoiceLink;
+
+      await replyWithButton(ctx, text, buttonText, buttonUrl);
+    } catch (error) {
+      console.error("Error creating invoice link:", error);
+      ctx.reply("❌ An error occurred while creating the invoice link.");
+    }
+  } else {
+    ctx.reply("❌ An error occurred while checking your subscription status.");
+  }
+});
+
+bot.on(message("document"), async (ctx) => {
+  console.log("Received a document message:", ctx.message.document.file_id);
+  const subscriptionStatus = await getSubscriptionStatus(ctx.from.id);
+  if (subscriptionStatus === true) {
+    ctx.reply("📥 Downloading the file...");
+  } else {
+    const isTrial = await getNumberOfJobs(ctx.from.id);
+    if (isTrial === true) {
+      ctx.reply("📥 Downloading the file...");
+    } else {
+      ctx.reply("❌ You need to subscribe to download files.");
+    }
+  }
+});
+
 bot.on(message("text"), async (ctx) => {
   console.log("Received a text message:", ctx.message.text);
-  ctx.reply("Hello! Send me a document to rename it.");
+  const subscriptionStatus = await getSubscriptionStatus(ctx.from.id);
+  console.log("Subscription status:", subscriptionStatus);
+  const numberOfJobs = await getNumberOfJobs(ctx.from.id);
+  console.log("Number of jobs:", numberOfJobs);
+});
 
-  try {
-    const invoiceLink = await ctx.telegram.createInvoiceLink({
-      title: "Test Invoice",
-      description: "Test",
-      payload: "test",
-      provider_token: "", // Pass an empty string for payments in Telegram Stars
-      currency: "XTR", // Use "XTR" for payments in Telegram Stars
-      prices: [{ label: "Test", amount: 1 }],
-      subscription_period: 2592000, // 30 days in seconds
-    });
-
-    ctx.reply(`Here is your invoice link: ${invoiceLink}`);
-  } catch (error) {
-    console.error("Error creating invoice link:", error);
-    ctx.reply("❌ An error occurred while creating the invoice link.");
-  }
+// When Not uploading as file
+bot.on([message("photo"), message("video")], async (ctx) => {
+  await ctx.reply(
+    "😵 *Please send content from files and not gallery*\n\ntap *File* in bottom bar after 📎 \n\n_Reason: Preserves Metadata and quality",
+    {
+      reply_to_message_id: ctx.message.message_id,
+      parse_mode: "Markdown",
+    }
+  );
 });
 
 // Handle document uploads using the modern message filter
@@ -63,10 +114,12 @@ bot.on(message("document"), async (ctx) => {
   }
 });
 
+//pre-checkout query
 bot.on("pre_checkout_query", async (ctx) => {
   ctx.answerPreCheckoutQuery(true);
 });
 
+// Handle successful payments
 bot.on(message("successful_payment"), async (ctx) => {
   console.log("Received a successful payment:", ctx.message.successful_payment);
   ctx.reply("🎉 Thank you for your payment!");

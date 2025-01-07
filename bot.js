@@ -11,45 +11,24 @@ import {
   addSubscription,
   getNumberOfJobs,
 } from "./src/services/supabase.js";
-import {
-  sendMessage,
-  createInvoiceLink,
-  handleSuccessfulPayment,
-  replyWithButton,
-} from "./src/services/telegram.js";
+// import {
+//   sendMessage,
+//   createInvoiceLink,
+//   handleSuccessfulPayment,
+//   replyWithButton,
+// } from "./src/services/telegram.js";
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 
 // *_*_*_*_*_*_*_*_*_*_*_*_**_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_
 
 bot.command("subscribe", async (ctx) => {
-  const subscriptionStatus = await getSubscriptionStatus(ctx.from.id);
+  const subscriptionStatus = await getSubscriptionStatus(346345345);
   if (subscriptionStatus === true) {
     ctx.reply("You are already subscribed!");
   } else if (subscriptionStatus === false) {
     try {
-      const invoiceLink = await ctx.telegram.createInvoiceLink({
-        title: "Subscription",
-        description: "Subscribe to get unlimited requests!",
-        payload: "subscription_payload",
-        provider_token: process.env.PROVIDER_TOKEN, // Ensure this is set in your .env file
-        currency: "USD",
-        prices: [{ label: "Subscription", amount: 1000 }], // Adjust the amount as needed
-        subscription_period: 2592000, // 30 days in seconds
-      });
-
-      const text = "Subscribe to get unlimited requests!";
-      const buttonText = "Subscribe ⭐️";
-      const buttonUrl = invoiceLink;
-
-      await replyWithButton(ctx, text, buttonText, buttonUrl);
-    } catch (error) {
-      console.error("Error creating invoice link:", error);
-      ctx.reply("❌ An error occurred while creating the invoice link.");
-    }
-  } else {
-    ctx.reply("❌ An error occurred while checking your subscription status.");
-  }
+      const invoiceLink = await 
 });
 
 bot.on(message("document"), async (ctx) => {

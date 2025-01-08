@@ -1,3 +1,12 @@
+import { getGpsCoords } from "./supabase.js";
+
+async function processContent(bool) {
+  console.log("Processing content...");
+  return false;
+}
+
+export { processContent };
+
 // import fs from "fs";
 // import { exiftool } from "exiftool-vendored";
 // import { fileTypeFromBuffer } from "file-type";

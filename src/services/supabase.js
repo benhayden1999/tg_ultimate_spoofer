@@ -41,7 +41,7 @@ async function getSubscriptionStatus(userId) {
   }
 }
 
-async function getTrialUsedStatus(userId) {
+async function hasTrial(userId) {
   try {
     const { data, error } = await supabase
       .from("users")
@@ -58,7 +58,7 @@ async function getTrialUsedStatus(userId) {
       return null;
     }
 
-    if (data.has_free_trial === false) {
+    if (!data.has_free_trial) {
       console.log("user has used the trial");
       return false;
     } else {
@@ -114,13 +114,18 @@ async function getGpsCoords(userId) {
       .single();
 
     if (error) {
-      throw error;
-    }
-
-    if (data.latitude === null || data.longitude === null) {
+      if (error.code === "PGRST116") {
+        console.log(`No such user: ${userId}`);
+        return false;
+      }
+      console.error("Error fetching subscription status:", error);
       return null;
     }
 
+    if (data.latitude === null || data.longitude === null) {
+      return false;
+    }
+    console.log(data);
     return data;
   } catch (err) {
     console.error("Error fetching GPS coordinates:", err);
@@ -146,7 +151,7 @@ export {
   supabase,
   getSubscriptionStatus,
   addSubscription,
-  getTrialUsedStatus,
+  hasTrial,
   addJob,
   getGpsCoords,
   SetGpsCoords,

@@ -2,22 +2,23 @@ import dotenv from "dotenv";
 dotenv.config();
 import { Telegraf, Markup } from "telegraf";
 import { message } from "telegraf/filters";
-import fetch from "node-fetch"; // To download files from Telegram
-import fs from "fs"; // To manage temporary files
-import path from "path"; // To handle file extensions
 import {
   getSubscriptionStatus,
   addSubscription,
   hasTrial,
+  removeFreeTrial,
   getGpsCoords,
-  SetGpsCoords,
+  setGpsCoords,
 } from "./src/services/supabase.js";
 import {
   createSubscriptionLink,
   createInvoiceLink,
 } from "./src/services/telegram.js";
 import { processContent } from "./src/services/processing.js";
-import { refundStarPayment } from "./src/services/axios.js";
+import {
+  refundStarPayment,
+  sendDocumentWithAxios,
+} from "./src/services/axios.js";
 
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 const subscriptionPrice = process.env.SUBSCRIPTION_PRICE;
@@ -25,67 +26,41 @@ const itemPrice = process.env.ITEM_PRICE;
 
 // *_*_*_*_*_*_*_*_*_*_*_*_**_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_
 
-// bot.on(message("document"), async (ctx) => {
-//   try {
-//     const subscriptionStatus = await getSubscriptionStatus(ctx.from.id);
-//     console.log("Subscription status:", subscriptionStatus);
+bot.command("start", async (ctx) => {
+  const content = `<b>😵‍💫This bot will add 'iPhone-like' metadata, including GPS coordinates, to your content.</b>\n\n<b>Why?</b>\n<blockquote expandable><b>1. Target specific locations 🌍</b>\n\n<span class="tg-spoiler">By adding GPS coordinates, you can control where your content gets promoted. Without GPS metadata, the algorithm might distribute your post randomly (e.g., 20% USA, 20% India, 40% China, 20% UK). With location-specific metadata, the algorithm focuses on your target audience. For example, you can ensure your content reaches English-speaking or wealthy regions, improving engagement and relevance.</span></blockquote>\n\n<blockquote expandable><b>2. Bypass AI re-upload detection 🤖</b>\n\n<span class="tg-spoiler">Platforms use AI to detect re-uploaded content, but they start with metadata checks because it’s the fastest and cheapest method. Advanced image recognition requires significant computational resources, so if your metadata mimics genuine iPhone uploads, your content is far less likely to be flagged. Instead, it often gets overlooked, allowing it to bypass these checks. By adding convincing metadata, the platform is more likely to assume you’re the original creator and push your content further.</span></blockquote>\n\n<blockquote expandable><b>3. Algorithms favor authentic content ✅</b>\n\n<span class="tg-spoiler">Platforms prioritize content they perceive as genuine. Photos or videos with iPhone-like metadata appear authentic, which makes them more likely to be promoted by the algorithm. Authentic metadata signals to the platform that the content is original and worth pushing to more users.</span></blockquote>\n\n<blockquote expandable><b>4. Lower risk of account bans 🔒</b>\n\n<span class="tg-spoiler">When pushing content aggressively, there’s always a risk of being flagged as spam. Metadata that appears authentic makes your account look like it belongs to a real user rather than a bot. Platforms are less likely to flag or ban accounts with legitimate-looking metadata, giving you a safer way to grow your content reach.</span></blockquote>`;
+  await ctx.reply(content, { parse_mode: "HTML" });
+});
 
-//     // Check if the user has a subscription
-//     if (subscriptionStatus) {
-//       await ctx.reply("📥 Downloading the file...");
-//       return;
-//     }
-//     // Check if the user has a free trial
-//     const trialUsed = await hasTrial(ctx.from.id);
+bot.command("virality", async (ctx) => {
+  const content = `<b>😵‍💫This bot will add 'iPhone-like' metadata, including GPS coordinates, to your content.</b>\n\n<b>Why?</b>\n<blockquote expandable><b>1. Target specific locations 🌍</b>\n\n<span class="tg-spoiler">By adding GPS coordinates, you can control where your content gets promoted. Without GPS metadata, the algorithm might distribute your post randomly (e.g., 20% USA, 20% India, 40% China, 20% UK). With location-specific metadata, the algorithm focuses on your target audience. For example, you can ensure your content reaches English-speaking or wealthy regions, improving engagement and relevance.</span></blockquote>\n\n<blockquote expandable><b>2. Bypass AI re-upload detection 🤖</b>\n\n<span class="tg-spoiler">Platforms use AI to detect re-uploaded content, but they start with metadata checks because it’s the fastest and cheapest method. Advanced image recognition requires significant computational resources, so if your metadata mimics genuine iPhone uploads, your content is far less likely to be flagged. Instead, it often gets overlooked, allowing it to bypass these checks. By adding convincing metadata, the platform is more likely to assume you’re the original creator and push your content further.</span></blockquote>\n\n<blockquote expandable><b>3. Algorithms favor authentic content ✅</b>\n\n<span class="tg-spoiler">Platforms prioritize content they perceive as genuine. Photos or videos with iPhone-like metadata appear authentic, which makes them more likely to be promoted by the algorithm. Authentic metadata signals to the platform that the content is original and worth pushing to more users.</span></blockquote>\n\n<blockquote expandable><b>4. Lower risk of account bans 🔒</b>\n\n<span class="tg-spoiler">When pushing content aggressively, there’s always a risk of being flagged as spam. Metadata that appears authentic makes your account look like it belongs to a real user rather than a bot. Platforms are less likely to flag or ban accounts with legitimate-looking metadata, giving you a safer way to grow your content reach.</span></blockquote>`;
+  await ctx.reply(content, { parse_mode: "HTML" });
+});
 
-//     if (!trialUsed) {
-//       await ctx.reply("📥 Downloading the file...");
-//       return;
-//     }
-//     // not has free trial - reply with invoices
-//     const invoiceLink = await createInvoiceLink(
-//       itemPrice,
-//       ctx.message.document.file_id
-//     );
-//     const subscriptionLink = await createSubscriptionLink(subscriptionPrice);
-//     await ctx.reply(
-//       "Choose an option:",
-//       Markup.inlineKeyboard([
-//         [Markup.button.url(`${itemPrice}⭐️ Pay Per Request`, invoiceLink)],
-//         [
-//           Markup.button.url(
-//             `${subscriptionPrice}⭐️ Unlimited Subscription`,
-//             subscriptionLink
-//           ),
-//         ],
-//       ])
-//     );
-//   } catch (error) {
-//     console.error("Error handling document:", error);
-//     await ctx.reply("❌ An error occurred while processing your document.");
-//   }
-// });
-
-bot.command("setcoords", async (ctx) => {
+bot.command("setlocation", async (ctx) => {
   ctx.reply(
-    "*Send the coordinates where you want the photos to appear as taken from.*\n\nClick the 📎 icon and select 'Location' from the bottom bar.\n\nℹ️ _We will save this location for you. To update it, simply send a new location._",
-    { parse_mode: "Markdown" }
+    "<b>🗺️ Send a location where you want the content to appear as taken from.</b>\n\nClick the 📎 icon and see 'location' in the bottom bar.\n\n<blockquote expandable><b>How adding location helps?</b>\n\n1. Posts are more likely to be pushed to people in that location.  You can target high income countries like USA, UAE etc.\n\n2. Your account is less likely to get banned as it's assumed you're posting raw content taken on an iPhone - not copied, AI etc. This gives your account more trust in the algorithm and it will be less likely to be flagged.</blockquote>",
+    { parse_mode: "HTML" }
   );
 });
 
 bot.on(message("location"), async (ctx) => {
   const latitude = ctx.message.location.latitude;
   const longitude = ctx.message.location.longitude;
-  await SetGpsCoords(ctx.from.id, latitude, longitude);
-  await ctx.telegram.unpinAllChatMessages(ctx.chat.id);
-  ctx
-    .reply(`📍 Location saved: ${latitude}, ${longitude}`)
-    .then((sentMessage) => {
-      ctx.telegram.pinChatMessage(ctx.chat.id, sentMessage.message_id);
-    });
+  const gpsCoordsSet = await setGpsCoords(ctx.from.id, latitude, longitude);
+  if (gpsCoordsSet) {
+    await ctx.telegram.unpinAllChatMessages(ctx.chat.id);
+    ctx
+      .reply(`📍 Location saved: ${latitude}, ${longitude}`)
+      .then((sentMessage) => {
+        ctx.telegram.pinChatMessage(ctx.chat.id, sentMessage.message_id);
+      });
+    ctx.reply("Now you can send in a photo file");
+  } else {
+    ctx.reply("An error occurred while saving the location. Please try again.");
+  }
 });
 
-bot.command("checkcoords", async (ctx) => {
+bot.command("checklocation", async (ctx) => {
   const coords = await getGpsCoords(ctx.from.id);
   if (coords === null) {
     ctx.reply(
@@ -100,62 +75,50 @@ bot.command("checkcoords", async (ctx) => {
   }
 });
 
-// bot.on(message("document"), async (ctx) => {
-//   try {
-//     const fileId = ctx.message.document.file_id;
-//     const originalFileName = document.file_name;
-//     const fileSize = document.file_size;
-//     const userId = ctx.from.id; // To ensure uniqueness
-
-//     console.log(
-//       `User ${userId} sent a file: ${originalFileName} (${fileSize} bytes)`
-//     );
-
-//     // 1. Validate file size (max 9.99 MB)
-//     if (fileSize > 9.99 * 1024 * 1024) {
-//       await ctx.reply(
-//         "❌ The file is too large. Maximum allowed size is 10MB."
-//       );
-//       return;
-//     }
-//     // 2) Hand off to the workflow in workflow.js
-//     const gpsCoords = await getGPSLocation(userId);
-//     await handleDocumentWorkflow(ctx, {
-//       fileId,
-//       originalFileName,
-//     });
-//   } catch (error) {
-//     console.error("Error handling document:", error);
-//     await ctx.reply("❌ An error occurred while processing your document.");
-//   }
-// });
-
 bot.command("affiliate", async (ctx) => {
   ctx.reply(
-    "🔗*Go to this bot's profile and join 'affiliate program' from there. For all stars spent through your link you will receive* *27%*🤑\n\n\n*▶️How to withdraw stars to cash?*\n\n1. *Commission sent to your personal account*\n_Personal accounts cannot withdraw star balances, they can only spend stars within Telegram... option 2 however;_\n\n2. *Commission sent to a channel you own*\n_Channels can withdraw to TON Crypto and from there to Local Currency.  So if you want to withdraw to the real world create a channel and set commission to go to this channel when when generating your affiliate link._",
-    { parse_mode: "Markdown" }
+    "<b>Go to this bot's profile and join 'affiliate program' from there. For all stars spent through your link you will receive</b> <b>27%🤑</b>\n\n<blockquote expandable><b>How to withdraw Stars to cash?</b>\n\n<b>TLDR</b>\nWhen getting your affiliate link choose to send Stars commission to a channel you own and not your personal.\n\n<b>1. Commission sent to your personal account</b>\nPersonal accounts cannot withdraw star balances, they can only spend stars within Telegram... <b>option 2 however;</b>\n\n2. <b>Commission sent to a channel you own</b>\nChannels can withdraw to TON Crypto and from there to Local Currency.  So if you want to withdraw to the real world create a channel and set commission to go to this channel when when generating your affiliate link.<b>TLDR</b>\nWhen getting your affiliate link choose to send Stars commission to a channel you own and not your personal.\n\n🤫How to get stars ~35% cheaper through telegrams other company /fragment.</blockquote>",
+    { parse_mode: "HTML" }
   );
 });
 
-bot.command("start", async (ctx) => {
-  ctx.reply("click /subscribe to get started");
+bot.command("fragment", async (ctx) => {
+  ctx.reply(
+    `<b>Get Telegram Stars ~30% off</b>\n\n1. Load up on some TON (Telegrams Crypto) using a wallet (the easiest to set up is <a href="https://tonkeeper.com/">TON Keeper</a> ~2min setup).\n\n2. Once you've got some TON in your wallet go to <a href="https://fragment.com/">Fragment</a> and buy Stars from there.\n\n<blockquote>This is because you're not buying through apple and androids App Stores which charges 30% per transaction.</blockquote>`,
+    { parse_mode: "HTML", disable_web_page_preview: true }
+  );
+  ctx.deleteMessage(ctx.message.message_id);
+  s;
 });
 
-bot.command("subscribe", async (ctx) => {
+bot.command("subscription", async (ctx) => {
   try {
-    const subscriptionStatus = await getSubscriptionStatus(4353453);
+    const subscriptionStatus = await getSubscriptionStatus(45345345);
     if (subscriptionStatus === true) {
-      await ctx.reply("You are already subscribed!");
+      await ctx.reply(
+        "You are already subscribed!\n<i>/cancelsubscription</i>",
+        { parse_mode: "HTML" }
+      );
     } else {
-      const invoiceLink = await createSubscriptionLink(price);
-      console.log("Invoice Link:", invoiceLink);
-      const text =
-        "🔓 Get *unlimited* requests for *1 month*\n\n_Subscription will auto-renew, use the cancel command to cancel._";
-      const buttonText = `Subscribe for ${price} ⭐️`;
-      await ctx.reply(text, {
-        parse_mode: "Markdown",
-        ...Markup.inlineKeyboard([Markup.button.url(buttonText, invoiceLink)]),
-      });
+      const invoiceLink = await createSubscriptionLink(subscriptionPrice);
+      const buttonText = `Subscribe for ${subscriptionPrice} ⭐️`;
+      await ctx.reply(
+        "🔓 Get <b>unlimited</b> requests for <b>1 month</b>\n\n<i>Subscription will auto-renew monthly.\n/cancelsubscription any time.</i>",
+        {
+          parse_mode: "HTML",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: buttonText,
+                  url: invoiceLink,
+                },
+              ],
+            ],
+          },
+        }
+      );
+      ctx.deleteMessage(ctx.message.message_id);
     }
   } catch (error) {
     console.error("Error in subscribe command:", error);
@@ -163,7 +126,7 @@ bot.command("subscribe", async (ctx) => {
   }
 });
 
-bot.command("cancelSubscription", async (ctx) => {
+bot.command("cancelsubscription", async (ctx) => {
   ctx.reply(
     "*How to cancel subscription*\n\n1. Go to your profile in Telegram\n" +
       "2. My Stars\n" +
@@ -171,76 +134,114 @@ bot.command("cancelSubscription", async (ctx) => {
       "4. Cancel Subscription",
     { parse_mode: "Markdown" }
   );
+  ctx.deleteMessage(ctx.message.message_id);
 });
 
-bot.on(message("document"), async (ctx) => {
-  console.log("Received a document message:", ctx.message.document.file_id);
-  const hasCoords = await getGpsCoords(ctx.from.id);
-  // Not set Coords & STOPS.
-  if (!hasCoords) {
-    ctx.reply(
-      "📍 <b>First set a location</b>\n\nClick the 📎 icon and select 'Location' from the bottom bar.\n\n<blockquote>ℹ️ We will save this location for you. To update it, simply send a new location.</blockquote>",
-      { parse_mode: "HTML" }
+//_*_*_*_*_*_*_*_*_*_*_*_**_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*
+
+// Check size and content type
+bot.on(message("document"), async (ctx, next) => {
+  const fileSize = ctx.message.document.file_size;
+  const contentType = ctx.message.document.mime_type.split("/")[0];
+  if (fileSize > 10 * 1024 * 1024 || contentType !== "image") {
+    await ctx.reply(
+      "❌ Unsupported file type. Please upload images only that are under 10Mb."
     );
-    return;
-  }
-  console.log("user has coords");
-  const subscriptionStatus = await getSubscriptionStatus(5646464646);
-  console.log("Subscription status:", subscriptionStatus);
-
-  // User has a subscription
-  if (subscriptionStatus) {
-    ctx.reply("📥 Downloading the file...");
-
-    // User doesn't have Subscription
-  } else {
-    const trialStatus = await hasTrial(ctx.from.id);
-    console.log("User has trial:", trialStatus);
-    if (trialStatus) {
-      ctx.reply("📥 Downloading the file...");
-    } else {
-      const invoiceLink = await createInvoiceLink(
-        itemPrice,
-        ctx.message.document.file_id
-      );
-      const subscriptionLink = await createSubscriptionLink(subscriptionPrice);
-      await ctx.reply(
-        "It looks like you have used your free trial, and are not subscribed to the unlimited plan.  Please chose an option:",
-        Markup.inlineKeyboard([
-          [Markup.button.url(`${itemPrice}⭐️ Pay Per Request`, invoiceLink)],
-          [
-            Markup.button.url(
-              `${subscriptionPrice}⭐️ Unlimited Subscription`,
-              subscriptionLink
-            ),
-          ],
-        ])
-      );
-    }
-  }
-});
-
-bot.on(message("text"), async (ctx, next) => {
-  console.log("Received a text message:", ctx.message.text);
-  const hasCoords = await getGpsCoords(ctx.from.id);
-  if (!hasCoords) {
-    ctx.reply(
-      "📍 <b>First set a location</b>\n\nClick the 📎 icon and select 'Location' from the bottom bar.\n\n<blockquote>ℹ️ We will save this location for you. To update it, simply send a new location.</blockquote>",
-      { parse_mode: "HTML" }
-    );
+    ctx.deleteMessage(ctx.message.message_id);
     return;
   }
   next();
 });
 
-bot.on(message("text"), async (ctx) => {
-  console.log("second message");
+// 1. Check if they have Coords
+bot.on(message("document"), async (ctx, next) => {
+  const coords = await getGpsCoords(ctx.from.id);
+  if (!coords) {
+    await ctx.reply(
+      "📍 <b>First set a location</b>\n\nClick the 📎 icon and select 'Location' from the bottom bar.\n\n<blockquote>ℹ️ We will save this location for you. To update it, simply send a new location.</blockquote>",
+      { parse_mode: "HTML" }
+    );
+    console.log("No coords set");
+    return;
+  }
+  ctx.coords = coords; // Attach hasCoords to ctx
+  next();
 });
-// const subscriptionStatus = await getSubscriptionStatus(ctx.from.id);
-// console.log("Subscription status:", subscriptionStatus);
-// const testInvoice = await createInvoiceLink(1, "paaaayloadd baby");
-// ctx.reply(`Test invoice link: ${testInvoice}`);
-// });
+
+// 2. Check if user has subscription
+bot.on(message("document"), async (ctx, next) => {
+  const subscriptionStatus = await getSubscriptionStatus(ctx.from.id);
+
+  if (subscriptionStatus) {
+    const fileId = ctx.message.document.file_id;
+    const coords = ctx.coords;
+    const iPhoneFilePath = await processContent(ctx, fileId, coords);
+
+    await ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo");
+
+    const success = await sendDocumentWithAxios(ctx, iPhoneFilePath);
+    if (!success) {
+      await ctx.reply(
+        "❌ An error occurred while sending your file. Please try again."
+      );
+    }
+    return;
+  }
+  next(); // Pass control to the next middleware
+});
+
+// 3. Check if user has trial
+bot.on(message("document"), async (ctx, next) => {
+  const trialStatus = await hasTrial(ctx.from.id);
+  console.log("User has trial:", trialStatus);
+  if (trialStatus) {
+    const fileId = ctx.message.document.file_id;
+    const coords = ctx.coords;
+    const iPhoneFilePath = await processContent(ctx, fileId, coords);
+    await ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo");
+    const success = await sendDocumentWithAxios(ctx, iPhoneFilePath);
+    if (!success) {
+      await ctx.reply(
+        "❌ An error occurred while sending your file. Please try again."
+      );
+    }
+    await removeFreeTrial(ctx.from.id);
+    return;
+  }
+  next(); // Pass control to the next middleware
+});
+
+/// Send payment options
+bot.on(message("document"), async (ctx) => {
+  const fileId = ctx.message.document.file_id;
+  const invoiceLink = await createInvoiceLink(itemPrice, fileId);
+  const subscriptionLink = await createSubscriptionLink(subscriptionPrice);
+
+  await ctx.reply(
+    "<b>Choose an option</b>\n\n<i>With-Pay-Per-Request you will be paying for the file that is being replied to above. Send another file if you don't want that one.</i>",
+    {
+      parse_mode: "HTML",
+      reply_to_message_id: ctx.message.message_id,
+      reply_markup: {
+        inline_keyboard: [
+          [
+            {
+              text: `${itemPrice} ⭐️ Pay Per Request`,
+              url: invoiceLink,
+            },
+          ],
+          [
+            {
+              text: `${subscriptionPrice} ⭐️ Unlimited Subscription`,
+              url: subscriptionLink,
+            },
+          ],
+        ],
+      },
+    }
+  );
+});
+//_*_*_*_*_*_*_*_*_*_*_*_**_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*_*
 
 // When Not uploading as file
 bot.on([message("photo"), message("video")], async (ctx) => {
@@ -251,6 +252,7 @@ bot.on([message("photo"), message("video")], async (ctx) => {
       parse_mode: "Markdown",
     }
   );
+  ctx.deleteMessage(ctx.message.message_id);
 });
 
 //pre-checkout query
@@ -258,74 +260,51 @@ bot.on("pre_checkout_query", async (ctx) => {
   ctx.answerPreCheckoutQuery(true);
 });
 
-// Handle successful payments
+// Payment successful
 bot.on(message("successful_payment"), async (ctx) => {
-  const userId = ctx.message.from.id;
-  const {
-    subscription_expiration_date: expirationDate,
-    telegram_payment_charge_id: paymentChargeId,
-    total_amount: totalAmount,
-    is_recurring: isRecurring,
-    invoice_payload: payload,
-  } = ctx.message.successful_payment;
-  console.log(isRecurring);
-  if (isRecurring) {
-    console.log("Handling subscription payment");
-    await addSubscription(userId, expirationDate, paymentChargeId, totalAmount);
-    ctx.reply(
-      "🎉 Thank you for subscribing! Your subscription is now active. You have unlimited requests!"
+  if (ctx.message.successful_payment.is_recurring) {
+    const subAdded = await addSubscription(
+      ctx.from.id,
+      ctx.message.successful_payment.subscription_expiration_date,
+      ctx.message.successful_payment.telegram_payment_charge_id,
+      ctx.message.successful_payment.total_amount
     );
-  } else {
-    console.log("Handling normal payment");
-    console.log("Payload:", payload);
-    const fileProcessed = await processContent(userId, payload);
-    console.log("File processed:", fileProcessed);
-    if (fileProcessed) {
+    if (subAdded) {
       ctx.reply(
-        "🎉 Thank you for your payment! Your request has been processed."
+        "🎉 Thank you! Your subscription is now active. You have unlimited requests!"
       );
     } else {
-      ctx.reply("Error occurred processing your request - refunding you now.");
-      const refunded = await refundStarPayment(userId, paymentChargeId);
+      ctx.reply(
+        "An error occurred while processing your subscription. We will also refund you now."
+      );
+      await refundStarPayment(
+        ctx.from.id,
+        ctx.message.successful_payment.telegram_payment_charge_id
+      );
     }
+  } else {
+    //handling individual payment
+    const fileId = ctx.message.successful_payment.invoice_payload;
+    const coords = await getGpsCoords(ctx.from.id);
+    const iPhoneFilePath = await processContent(ctx, fileId, coords);
+    await ctx.telegram.sendChatAction(ctx.chat.id, "upload_photo");
+    const success = await sendDocumentWithAxios(ctx, iPhoneFilePath);
+    if (!iPhoneFilePath || !success) {
+      await ctx.reply(
+        "An error occurred while processing your file. We will refund you, but please try again."
+      );
+      await refundStarPayment(
+        ctx.from.id,
+        ctx.message.successful_payment.telegram_payment_charge_id
+      );
+    }
+    return;
   }
 });
 
-// if (ctx.message.successful_payment.is_recurring) {
-//   // Handle subscription payment
-//   console.log("Handling subscription payment");
-//   await addSubscription(
-//     ctx.from.id,
-//     payment.subscription_expiration_date,
-//     payment.telegram_payment_charge_id,
-//     payment.total_amount
-//   );
-//   ctx.reply("🎉 Thank you for subscribing! Your subscription is now active.");
-// } else {
-//   // Handle normal payment
-//   console.log("Handling normal payment");
-//   ctx.reply("🎉 Thank you for your payment! Your request has been processed.");
-//   try {
-
-//   }
-// }
-
-// try {
-//   const refunded = await refundStarPayment(
-//     fromId,
-//     paymentChargeId
-//   );
-//   if (refunded) {
-//     console.log("Payment refunded successfully.");
-//     ctx.reply(
-//       "Something went wrong with processing your file and we have refunded your stars."
-//     );
-//   } else {
-//     console.log("Failed to refund payment.");
-//   }
-// } catch (error) {
-//   console.error("Error refunding payment:", error);
-// }
+bot.on("message", async (ctx) => {
+  await ctx.reply("Please send an image as a file and we'll do the rest.");
+});
 
 // Start the bot
 bot

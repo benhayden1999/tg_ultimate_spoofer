@@ -4,8 +4,8 @@ const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
 // Function to create an invoice link
 async function createSubscriptionLink(price) {
   const invoice = {
-    title: "1 Month Subscription",
-    description: "Unlimited Spoof Requests for 1 month",
+    title: "1 Month Unlimited Subscription",
+    description: "Unlimited Requests",
     payload: "subscription_payload",
     provider_token: "",
     currency: "XTR",
@@ -25,8 +25,8 @@ async function createSubscriptionLink(price) {
 // Function to create an invoice link
 async function createInvoiceLink(price, fileId) {
   const invoice = {
-    title: "Pay Per Spoof",
-    description: "Run a single Content spoof",
+    title: "Individual Request",
+    description: "Run an individual request",
     payload: fileId,
     provider_token: "",
     currency: "XTR",

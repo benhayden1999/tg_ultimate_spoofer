@@ -58,8 +58,8 @@ async function hasTrial(userId) {
       return null;
     }
 
-    if (!data.has_free_trial) {
-      console.log("user has used the trial");
+    if (data.has_free_trial === false) {
+      console.log("user hasn't got a free trial");
       return false;
     } else {
       console.log("user has got the trial");
@@ -77,22 +77,34 @@ async function addSubscription(
   subscriptionChargeId,
   subscriptionAmount
 ) {
-  const { data, error } = await supabase
-    .from("users")
-    .upsert(
-      {
-        user_id: userId,
-        subscription_expiration_date: subscriptionExpirationDate,
-        telegram_payment_charge_id: subscriptionChargeId,
-        subscription_amount: subscriptionAmount,
-        subscription_status: true,
-      },
-      { onConflict: ["user_id"] }
-    )
-    .single();
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .upsert(
+        {
+          user_id: userId,
+          subscription_expiration_date: subscriptionExpirationDate,
+          telegram_payment_charge_id: subscriptionChargeId,
+          subscription_amount: subscriptionAmount,
+          subscription_status: true,
+        },
+        { onConflict: ["user_id"] }
+      )
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    console.log("Subscription added successfully:", data);
+    return true;
+  } catch (error) {
+    console.error("Error adding subscription:", error);
+    return false;
+  }
 }
 
-async function addJob(userId) {
+async function removeFreeTrial(userId) {
   const { data, error } = await supabase
     .from("users")
     .upsert(
@@ -133,18 +145,30 @@ async function getGpsCoords(userId) {
   }
 }
 
-async function SetGpsCoords(userId, latitude, longitude) {
-  const { data, error } = await supabase
-    .from("users")
-    .upsert(
-      {
-        user_id: userId,
-        latitude: latitude,
-        longitude: longitude,
-      },
-      { onConflict: ["user_id"] }
-    )
-    .single();
+async function setGpsCoords(userId, latitude, longitude) {
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .upsert(
+        {
+          user_id: userId,
+          latitude: latitude,
+          longitude: longitude,
+        },
+        { onConflict: ["user_id"] }
+      )
+      .single();
+
+    if (error) {
+      throw error;
+    }
+
+    console.log("GPS coordinates set successfully:", data);
+    return true;
+  } catch (error) {
+    console.error("Error setting GPS coordinates:", error);
+    return false;
+  }
 }
 
 export {
@@ -152,7 +176,7 @@ export {
   getSubscriptionStatus,
   addSubscription,
   hasTrial,
-  addJob,
+  removeFreeTrial,
   getGpsCoords,
-  SetGpsCoords,
+  setGpsCoords,
 };
